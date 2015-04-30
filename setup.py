@@ -19,7 +19,8 @@ setup(
     url='https://github.com/touchandgo-devs/touchandgo/',
     license='LICENSE.txt',
     long_description=open('README.rst').read(),
-    install_requires=['TorrentMediaSearcher',
+    install_requires=[
+                      'TorrentMediaSearcher',
                       'subliminal',
                       'netifaces',
                       'flask',

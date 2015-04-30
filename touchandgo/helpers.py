@@ -3,12 +3,18 @@ import logging
 import signal
 import socket
 
-from daemon import DaemonContext
+try:
+    from daemon import DaemonContext
+except ImportError:
+    # dude we are on windows
+    pass
+
 from datetime import datetime
 from lock import Lock
 from os import mkdir
 from os.path import getmtime, exists, dirname, join
 from shutil import copyfile
+import sys
 
 from netifaces import interfaces, ifaddresses
 from ojota import set_data_source
@@ -18,18 +24,35 @@ from qtfaststart.exceptions import FastStartException
 from altasetting import Settings
 from touchandgo.settings import SKIP_MOOV
 
+import tempfile
 
-LOCKFILE = "/tmp/touchandgo"
+LOCKFILE,_ = tempfile.mkstemp(suffix="touchandgo")
 
 log = logging.getLogger('touchandgo.helpers')
 
+def settings_path():
+    return os.getenv("HOME", os.getenv('APPDATA'))
+
 
 def get_settings():
-    settings_file = "%s/.touchandgo/settings.yaml" % os.getenv("HOME")
+    #settings_file = "%s/.touchandgo/settings.yaml" % settings_path()
+    settings_file = os.path.join(settings_path(),".touchandgo","settings.yaml")
     default = join(dirname(__file__), "templates", "settings.yaml")
-
+    print settings_file
     set_config_dir()
     if not exists(settings_file):
+        if "win" in sys.platform:
+            # well the settings.yaml had a default to /tmp/ on windows that not exist
+            import yaml, tempfile
+            settings_ = {}
+            with open(default) as f:
+                settings_ = yaml.load(f)
+                settings_["save_path"] = os.path.join(settings_path(), ".touchandgo")
+            # create a temporal file and dumps te new save_path
+            tmp_stream, temporal_file = tempfile.mkstemp()
+            data = yaml.dump(settings_)
+            os.write(tmp_stream, data)
+            default = temporal_file
         copyfile(default, settings_file)
 
     settings = Settings(settings_file, default)
@@ -79,6 +102,7 @@ def is_process_running(process_id):
 
 def daemonize(args, callback):
     with DaemonContext():
+
         from touchandgo.logger import log_set_up
         log_set_up(True)
         log = logging.getLogger('touchandgo.daemon')
@@ -125,7 +149,7 @@ def get_lock_diff():
 
 
 def set_config_dir():
-    data_folder = "%s/.touchandgo" % os.getenv("HOME")
+    data_folder = os.path.join(settings_path(), ".touchandgo")
     if not exists(data_folder):
         mkdir(data_folder)
 
