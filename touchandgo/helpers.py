@@ -3,12 +3,6 @@ import logging
 import signal
 import socket
 
-try:
-    from daemon import DaemonContext
-except ImportError:
-    # dude we are on windows
-    pass
-
 from datetime import datetime
 from lock import Lock
 from os import mkdir
@@ -23,6 +17,7 @@ from qtfaststart.exceptions import FastStartException
 
 from altasetting import Settings
 from touchandgo.settings import SKIP_MOOV
+import threading
 
 import tempfile
 
@@ -99,42 +94,44 @@ def is_process_running(process_id):
     except OSError:
         return False
 
-
 def daemonize(args, callback):
-    with DaemonContext():
+    deamon = threading.Thread(name="tandg", target=_daemonize, args =[args, callback])
+    deamon.daemon = True
+    deamon.start()
 
-        from touchandgo.logger import log_set_up
-        log_set_up(True)
-        log = logging.getLogger('touchandgo.daemon')
-        log.info("running daemon")
-        create_process = False
-        lock = Lock(LOCKFILE, os.getpid(), args.name, args.sea_ep[0],
-                    args.sea_ep[1], args.port)
-        if lock.is_locked():
-            log.debug("lock active")
-            lock_pid = lock.get_pid()
-            if not lock.is_same_file(args.name, args.sea_ep[0],
-                                     args.sea_ep[1]) \
-                    or not is_process_running(lock_pid):
-                try:
-                    log.debug("killing process %s" % lock_pid)
-                    os.kill(lock_pid, signal.SIGQUIT)
-                except OSError:
-                    pass
-                except TypeError:
-                    pass
-                lock.break_lock()
-                create_process = True
-        else:
+def _daemonize(args, callback):
+    from touchandgo.logger import log_set_up
+    log_set_up(True)
+    log = logging.getLogger('touchandgo.daemon')
+    log.info("running daemon")
+    create_process = False
+    lock = Lock(LOCKFILE, os.getpid(), args.name, args.sea_ep[0],
+                args.sea_ep[1], args.port)
+    if lock.is_locked():
+        log.debug("lock active")
+        lock_pid = lock.get_pid()
+        if not lock.is_same_file(args.name, args.sea_ep[0],
+                                 args.sea_ep[1]) \
+                or not is_process_running(lock_pid):
+            try:
+                log.debug("killing process %s" % lock_pid)
+                os.kill(lock_pid, signal.SIGQUIT)
+            except OSError:
+                pass
+            except TypeError:
+                pass
+            lock.break_lock()
             create_process = True
+    else:
+        create_process = True
 
-        if create_process:
-            log.debug("creating proccess")
-            lock.acquire()
-            callback()
-            lock.release()
-        else:
-            log.debug("same daemon process")
+    if create_process:
+        log.debug("creating proccess")
+        lock.acquire()
+        callback()
+        lock.release()
+    else:
+        log.debug("same daemon process")
 
 
 def get_lock_diff():
