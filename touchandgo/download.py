@@ -10,7 +10,7 @@ from os.path import join, exists
 from time import sleep
 from datetime import datetime
 
-from colorama import Fore
+from colorama import Fore, init
 from guessit import guess_video_info
 from libtorrent import add_magnet_uri, session, storage_mode_t
 
@@ -23,7 +23,7 @@ from touchandgo.strategy import DefaultStrategy
 from touchandgo.stream_server import serve_file
 from touchandgo.subtitles import SubtitleDownloader
 
-
+init()
 log = logging.getLogger('touchandgo.download')
 
 
