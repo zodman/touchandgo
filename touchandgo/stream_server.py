@@ -28,11 +28,8 @@ class VideoHandler(SimpleHTTPRequestHandler):
     manager = None
 
     def handle_one_request(self, *args, **kwargs):
-        try:
-            return SimpleHTTPRequestHandler.handle_one_request(self, *args,
+        return SimpleHTTPRequestHandler.handle_one_request(self, *args,
                                                                 **kwargs)
-        except:
-            pass
 
     def status(self):
         log.debug("returning 200 code")
@@ -143,8 +140,16 @@ class VideoHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Accept-Ranges", "bytes")
         guess = self.manager.guess(path)
-        self.send_header("Content-Type", guess['mimetype'])
-        log.debug("mime type is %s" % guess['mimetype'])
+        mimetype = guess.get("mimetype", None)
+        if not mimetype:
+            # ok guessit not put a mimetype well small patch here
+            if guess.get("container") == "mkv":
+                mimetype = "video/x-matroska"
+            else:
+                mimetype = "video/mp4"
+
+        self.send_header("Content-Type", mimetype)
+        log.debug("mime type is %s" % mimetype)
         log.debug("range %s to %s" % (self.range_from, self.range_to))
         if self.range_from is not None or self.range_to is not None:
             # TODO: Should also check that range is within the file size
@@ -168,6 +173,7 @@ class VideoHandler(SimpleHTTPRequestHandler):
                 self.wfile.flush()
                 self.wfile.close()
         except Exception:
+
             pass
         self.rfile.close()
 

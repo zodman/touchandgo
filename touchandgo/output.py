@@ -18,6 +18,7 @@ class Output(object):
             subs = ""
 
         command = "%s %s" % (player_command, subs)
+
         system(command)
 
     def _player(self):
