@@ -2,8 +2,9 @@ import os
 import logging
 import signal
 import socket
-
 from daemon import DaemonContext
+
+
 from datetime import datetime
 from os import mkdir
 from os.path import getmtime, exists, dirname, join
@@ -13,14 +14,16 @@ from altasetting import Settings
 from netifaces import interfaces, ifaddresses
 from ojota import set_data_source
 from touchandgo.lock import Lock
+import tempfile as tmpfile
 
-
-LOCKFILE = "/tmp/touchandgo"
+LOCKFILE = os.path.join(tmpfile.gettempdir(), "TOUCHANDGOLOCK")
 log = logging.getLogger('touchandgo.helpers')
+
+HOMEDIR = os.getenv("HOME", os.getenv("APPDATA"))
 
 
 def get_settings():
-    settings_file = "%s/.touchandgo/settings.yaml" % os.getenv("HOME")
+    settings_file = os.path.join(HOMEDIR, ".touchandgo", "settings.yaml")
     default = join(dirname(__file__), "templates", "settings.yaml")
 
     set_config_dir()
@@ -119,7 +122,7 @@ def get_lock_diff():
 
 
 def set_config_dir():
-    data_folder = "%s/.touchandgo" % os.getenv("HOME")
+    data_folder = os.path.join(HOMEDIR, ".touchandgo")
     if not exists(data_folder):
         mkdir(data_folder)
 
