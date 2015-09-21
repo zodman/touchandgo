@@ -11,7 +11,7 @@ from time import sleep
 from datetime import datetime, timedelta
 
 from blessings import Terminal
-from colorama import Fore
+from colorama import Fore, init as colorama_init
 from guessit import guess_video_info
 from libtorrent import add_magnet_uri, session, storage_mode_t
 
@@ -24,7 +24,7 @@ from touchandgo.output import VLCOutput, OMXOutput, CastOutput
 from touchandgo.settings import DEBUG, WAIT_FOR_IT, DEFAULT_PORT
 from touchandgo.stream_server import serve_file
 
-
+colorama_init()
 log = logging.getLogger('touchandgo.download')
 term = Terminal()
 
@@ -34,7 +34,7 @@ class DownloadManager(object):
     sub_downloader_class = SubtitleDownloader
 
     def __init__(self, magnet, port=None, sub_lang=None, serve=False,
-                 player=None):
+                 player=None, index_file=None):
         self.settings = get_settings()
         self.magnet = magnet
         if port is None:
@@ -52,6 +52,8 @@ class DownloadManager(object):
         if player is None:
             player = self.settings.players.default
         self.player = player
+
+        self.index_file = int(index_file)
 
         # number of pieces to wait until start streaming
         # we are waiting untill all the first peices are downloaded
@@ -141,11 +143,16 @@ class DownloadManager(object):
         info = self.handle.get_torrent_info()
         biggest_file = ("", 0)
         files = info.files()
-        for file_ in files:
-            if file_.size > biggest_file[1]:
-                biggest_file = [file_.path, file_.size]
+        print files
+        if self.index_file is None:
+            for file_ in files:
+                if file_.size > biggest_file[1]:
+                    biggest_file = [file_.path, file_.size]
 
-        return biggest_file
+            return biggest_file
+        else:
+            file_ = files[self.index_file]
+            return [file_.path, file_.size]
 
     def wait_for_file(self):
         while not exists(join(self.settings.save_path, self.video_file[0])):
@@ -252,11 +259,12 @@ def main():
     parser.add_argument("--sub", nargs='?', default=None)
     parser.add_argument("--serve", action="store_true")
     parser.add_argument("--port", "-p", default="8888")
+    parser.add_argument("--index", default=None)
 
     args = parser.parse_args()
 
     manager = DownloadManager(args.magnet, port=args.port, serve=args.serve,
-                              sub_lang=args.sub)
+                              sub_lang=args.sub, index_file=args.index)
     manager.start()
 
 if __name__ == "__main__":
