@@ -7,6 +7,58 @@ from touchandgo.helpers import get_settings
 log = logging.getLogger('touchandgo.strategy')
 
 
+class FileStrategy(object):
+    def __init__(self, manager):
+        settings = get_settings()
+        self.settings = settings.strategy
+        self.manager = manager
+        self.holding_stream = True
+        self.handle = manager.handle
+        self.moov_downloaded = False
+        self.download_lasts = False
+        self.chunks_strat = self.settings.chunks_strat
+
+
+    def initial(self):
+        for ind, i in enumerate(self.handle.get_torrent_info().files()):
+            if ind == self.manager.index_file:
+                self.handle.file_priority(self.manager.index_file, 7)
+            else:
+                self.handle.file_priority(ind, 0)
+
+        log.info("set file priority %s" % self.handle.file_priorities())
+        self.handle.set_sequential_download(True)
+
+    def master(self):
+        self.manager.stream()
+
+    def block_requested(self, first_block):
+        log.debug("moving strategy %s" % first_block)
+        self.reset_priorities()
+
+        status = self.handle.status()
+        last_piece = len(status.pieces) - 1
+
+        last_chunks = first_block + self.chunks_strat
+        if last_chunks > last_piece:
+            last_chunks = last_piece
+        for i in range(first_block, last_chunks):
+            self.handle.piece_priority(i, 7)
+            self.handle.set_piece_deadline(i, 10000)
+
+        last_chunks = first_block + self.chunks_strat * 2
+        if last_chunks > last_piece:
+            last_chunks = last_piece
+        for i in range(first_block+self.chunks_strat, last_chunks):
+            self.handle.piece_priority(i, 3)
+            self.handle.set_piece_deadline(i, 20000)
+
+        self.piece_st = first_block + self.chunks_strat
+
+    def reset_priorities(self):
+        for i in range(len(self.handle.status().pieces)):
+            self.handle.piece_priority(i, 1)
+
 class DefaultStrategy(object):
     def __init__(self, manager):
         settings = get_settings()
@@ -23,10 +75,16 @@ class DefaultStrategy(object):
     def initial(self):
         self.handle.set_sequential_download(True)
         status = self.handle.status()
+        for i in self.handle.files():
+            if i == self.mananger.index_file:
+                self.handle.file_priority(self.manager.index_file, 7)
+            else:
+                self.handle.file_priority(self.manager.index_file, 0)
+        log.info("set file priority %s" % self.handle.file_priorities())
 
-        for i in range(self.piece_st):
-            self.handle.piece_priority(i, 7)
-            self.handle.set_piece_deadline(i, 3000)
+        #for i in range(self.piece_st):
+            #self.handle.piece_priority(i, 7)
+            #self.handle.set_piece_deadline(i, 3000)
 
         self.chunks_strat = len(status.pieces) / 30
 
@@ -78,6 +136,7 @@ class DefaultStrategy(object):
                 self.download_lasts = True
 
     def reset_priorities(self):
+
         for i in range(len(self.handle.status().pieces)):
             self.handle.piece_priority(i, 1)
 
@@ -100,6 +159,6 @@ class DefaultStrategy(object):
             last_chunks = last_piece
         for i in range(first_block+self.chunks_strat, last_chunks):
             self.handle.piece_priority(i, 3)
-            #self.handle.set_piece_deadline(i, 20000)
+            self.handle.set_piece_deadline(i, 20000)
 
         self.piece_st = first_block + self.chunks_strat

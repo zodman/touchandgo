@@ -16,7 +16,7 @@ from guessit import guess_video_info
 from libtorrent import add_magnet_uri, session, storage_mode_t
 
 from touchandgo.constants import STATES
-from touchandgo.download.strategy import DefaultStrategy
+from touchandgo.download.strategy import DefaultStrategy, FileStrategy
 from touchandgo.download.subtitles import SubtitleDownloader
 from touchandgo.helpers import is_port_free, get_free_port, get_settings
 from touchandgo.logger import log_set_up
@@ -30,9 +30,9 @@ term = Terminal()
 
 
 class DownloadManager(object):
-    strategy_class = DefaultStrategy
+    strategy_class = FileStrategy
     sub_downloader_class = SubtitleDownloader
-
+ 
     def __init__(self, magnet, port=None, sub_lang=None, serve=False,
                  player=None, index_file=None):
         self.settings = get_settings()
@@ -53,7 +53,8 @@ class DownloadManager(object):
             player = self.settings.players.default
         self.player = player
 
-        self.index_file = int(index_file)
+        self.index_file = index_file
+
 
         # number of pieces to wait until start streaming
         # we are waiting untill all the first peices are downloaded
@@ -143,12 +144,12 @@ class DownloadManager(object):
         info = self.handle.get_torrent_info()
         biggest_file = ("", 0)
         files = info.files()
-        print files
         if self.index_file is None:
-            for file_ in files:
+            for index, file_ in enumerate(files):
                 if file_.size > biggest_file[1]:
                     biggest_file = [file_.path, file_.size]
-
+                    self.index_file = index
+            log.debug("index = file %s %s " % (self.index_file, file_.path))
             return biggest_file
         else:
             file_ = files[self.index_file]
@@ -180,12 +181,11 @@ class DownloadManager(object):
 
     def stream(self):
         if self.callback is not None and not self.streaming:
+            log.info("stream")
             self.streaming = True
             pieces = self.status.pieces
             self._served_blocks = [False for i in range(len(pieces))]
             self.stream_th = thread.start_new_thread(self.callback, (self, ))
-            if not self.serve:
-                self.player_th = thread.start_new_thread(self.output, ())
 
     def block_served(self, block):
         self._served_blocks[block] = True
@@ -201,7 +201,8 @@ class DownloadManager(object):
                 numeral = Fore.YELLOW + "v"
             elif self._served_blocks is not None and self._served_blocks[i]:
                 numeral = Fore.BLUE + ">"
-            numeral += str(self.handle.piece_priority(i))
+            numeral_ = str(self.handle.piece_priority(i))
+            numeral += numeral_
             numerales += numeral
         if numerales != "":
             numerales = term.magenta("\nPieces download state:\n" + numerales)
@@ -259,7 +260,7 @@ def main():
     parser.add_argument("--sub", nargs='?', default=None)
     parser.add_argument("--serve", action="store_true")
     parser.add_argument("--port", "-p", default="8888")
-    parser.add_argument("--index", default=None)
+    parser.add_argument("--index", default=None, type=int)
 
     args = parser.parse_args()
 

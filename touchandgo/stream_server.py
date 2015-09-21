@@ -28,12 +28,8 @@ class VideoHandler(SimpleHTTPRequestHandler):
     manager = None
 
     def handle_one_request(self, *args, **kwargs):
-        try:
-            return SimpleHTTPRequestHandler.handle_one_request(self, *args,
+        return SimpleHTTPRequestHandler.handle_one_request(self, *args,
                                                                **kwargs)
-        except:
-            pass
-
     def status(self):
         log.debug("returning 200 code")
         self.send_response(200)
@@ -113,13 +109,14 @@ class VideoHandler(SimpleHTTPRequestHandler):
 
         """
         path = self.manager.get_video_path()
+        log.info("check file exist %s" % path)
         try:
             # Always read in binary mode. Opening files in text mode may
             # cause newline translations, making the actual size of the
             # content transmitted *less* than the content-length!
             f = open(path, 'rb')
         except IOError:
-            self.send_error(404, "File not found")
+            self.send_error(404, "grrrr File not found")
             return None
 
         fs = fstat(f.fileno())
